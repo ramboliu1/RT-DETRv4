@@ -43,7 +43,6 @@ class RTv4Criterion(nn.Module):
                  share_matched_indices=False,
                  mal_alpha=None,
                  use_uni_set=True,
-                 distill_adaptive_params=None,
                  ):
         """Create the criterion.
         Parameters:
@@ -70,54 +69,6 @@ class RTv4Criterion(nn.Module):
         self.mal_alpha = mal_alpha
         self.use_uni_set = use_uni_set
 
-        self.distill_adaptive_params = distill_adaptive_params
-
-
-    def loss_distillation(self, outputs, targets, indices, num_boxes, **kwargs):
-        student_feature_map = outputs.get('student_distill_output')
-        teacher_feature_map = outputs.get('teacher_encoder_output')
-
-        if student_feature_map is None or teacher_feature_map is None:
-            return {'loss_distill': torch.tensor(0.0,
-                                                 device=student_feature_map.device if student_feature_map is not None else torch.device(
-                                                     'cuda'), requires_grad=True)}
-
-        # _logger.info(f"[RTv4Criterion] Student feature map shape: {student_feature_map.shape}")
-        # _logger.info(f"[RTv4Criterion] Teacher feature map shape: {teacher_feature_map.shape}")
-
-        if student_feature_map.shape[1] != teacher_feature_map.shape[1]:
-            _logger.error(
-                f"[RTv4Criterion] Feature dimension mismatch! Student: {student_feature_map.shape[1]}, Teacher: {teacher_feature_map.shape[1]}")
-            raise ValueError("Feature dimension mismatch between student and teacher for distillation loss.")
-
-        H_s, W_s = student_feature_map.shape[2:]
-        H_t, W_t = teacher_feature_map.shape[2:]
-
-        target_h, target_w = H_s, W_s
-
-        if (H_s, W_s) != (H_t, W_t):
-            _logger.warning(
-                f"[RTv4Criterion] Resizing teacher feature map from {H_t}x{W_t} to student's {H_s}x{W_s} for distillation.")
-            teacher_feature_map = F.interpolate(teacher_feature_map,
-                                                size=(target_h, target_w),
-                                                mode='bilinear',
-                                                align_corners=False)
-
-        student_output_flat = student_feature_map.flatten(2).permute(0, 2, 1)
-        teacher_output_flat = teacher_feature_map.flatten(2).permute(0, 2, 1)
-
-        student_output_norm = F.normalize(student_output_flat, p=2, dim=-1)
-        teacher_output_norm = F.normalize(teacher_output_flat, p=2, dim=-1)
-
-        cos_sim = F.cosine_similarity(student_output_norm, teacher_output_norm, dim=-1)
-        loss_distill = (1 - cos_sim).mean()
-
-        return {'loss_distill': loss_distill}
-
-
-    def _get_distillation_weight_for_epoch(self) -> float:
-        fixed_weight = self.weight_dict.get('loss_distill', 0.0)
-        return fixed_weight
 
     def loss_labels_focal(self, outputs, targets, indices, num_boxes):
         assert 'pred_logits' in outputs
@@ -244,33 +195,6 @@ class RTv4Criterion(nn.Module):
             losses['loss_fgl'] = self.unimodal_distribution_focal_loss(
                 pred_corners, target_corners, weight_right, weight_left, weight_targets, avg_factor=num_boxes)
 
-            if 'teacher_corners' in outputs:
-                pred_corners = outputs['pred_corners'].reshape(-1, (self.reg_max + 1))
-                target_corners = outputs['teacher_corners'].reshape(-1, (self.reg_max + 1))
-                if not torch.equal(pred_corners, target_corners):
-                    weight_targets_local = outputs['teacher_logits'].sigmoid().max(dim=-1)[0]
-
-                    mask = torch.zeros_like(weight_targets_local, dtype=torch.bool)
-                    mask[idx] = True
-                    mask = mask.unsqueeze(-1).repeat(1, 1, 4).reshape(-1)
-
-                    weight_targets_local[idx] = ious.reshape_as(weight_targets_local[idx]).to(
-                        weight_targets_local.dtype)
-                    weight_targets_local = weight_targets_local.unsqueeze(-1).repeat(1, 1, 4).reshape(-1).detach()
-
-                    loss_match_local = weight_targets_local * (T ** 2) * (nn.KLDivLoss(reduction='none')
-                                                                          (F.log_softmax(pred_corners / T, dim=1),
-                                                                           F.softmax(target_corners.detach() / T,
-                                                                                     dim=1))).sum(-1)
-                    if 'is_dn' not in outputs:
-                        batch_scale = 8 / outputs['pred_boxes'].shape[0]  # Avoid the influence of batch size per GPU
-                        self.num_pos, self.num_neg = (mask.sum() * batch_scale) ** 0.5, (
-                                    (~mask).sum() * batch_scale) ** 0.5
-                    loss_match_local1 = loss_match_local[mask].mean() if mask.any() else 0
-                    loss_match_local2 = loss_match_local[~mask].mean() if (~mask).any() else 0
-                    losses['loss_ddf'] = (loss_match_local1 * self.num_pos + loss_match_local2 * self.num_neg) / (
-                                self.num_pos + self.num_neg)
-
         return losses
 
     def _get_src_permutation_idx(self, indices):
@@ -318,7 +242,6 @@ class RTv4Criterion(nn.Module):
             'vfl': self.loss_labels_vfl,
             'mal': self.loss_labels_mal,
             'local': self.loss_local,
-            'distill': self.loss_distillation,  # NEW: Add distillation loss
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
@@ -372,20 +295,13 @@ class RTv4Criterion(nn.Module):
         losses = {}
         for loss_name in self.losses:
             # TODO, indices and num_box are different from RT-DETRv2
-            if loss_name == 'distill':
-                l_dict = self.get_loss(loss_name, outputs, targets, None, None, **kwargs)
-                if 'loss_distill' in l_dict and l_dict['loss_distill'] != 0:
-                    dynamic_weight = self._get_distillation_weight_for_epoch()
-                    l_dict['loss_distill'] = l_dict['loss_distill'] * dynamic_weight
-                losses.update(l_dict)
-            else:
-                use_uni_set = self.use_uni_set and (loss_name in ['boxes', 'local'])
-                indices_in = indices_go if use_uni_set else indices
-                num_boxes_in = num_boxes_go if use_uni_set else num_boxes
-                meta = self.get_loss_meta_info(loss_name, outputs, targets, indices_in)
-                l_dict = self.get_loss(loss_name, outputs, targets, indices_in, num_boxes_in, **meta)
-                l_dict = {k: l_dict[k] * self.weight_dict[k] for k in l_dict if k in self.weight_dict}
-                losses.update(l_dict)
+            use_uni_set = self.use_uni_set and (loss_name in ['boxes', 'local'])
+            indices_in = indices_go if use_uni_set else indices
+            num_boxes_in = num_boxes_go if use_uni_set else num_boxes
+            meta = self.get_loss_meta_info(loss_name, outputs, targets, indices_in)
+            l_dict = self.get_loss(loss_name, outputs, targets, indices_in, num_boxes_in, **meta)
+            l_dict = {k: l_dict[k] * self.weight_dict[k] for k in l_dict if k in self.weight_dict}
+            losses.update(l_dict)
 
         # In case of auxiliary losses, we repeat this process with the output of each intermediate layer.
         if 'aux_outputs' in outputs:
@@ -404,7 +320,7 @@ class RTv4Criterion(nn.Module):
                     l_dict = {k + f'_aux_{i}': v for k, v in l_dict.items()}
                     losses.update(l_dict)
 
-        # In case of auxiliary traditional head output at first decoder layer. just for dfine
+            # In case of auxiliary traditional head output at first decoder layer.
         if 'pre_outputs' in outputs:
             aux_outputs = outputs['pre_outputs']
             for loss in self.losses:
@@ -464,7 +380,7 @@ class RTv4Criterion(nn.Module):
                     l_dict = {k + f'_dn_{i}': v for k, v in l_dict.items()}
                     losses.update(l_dict)
 
-            # In case of auxiliary traditional head output at first decoder layer, just for dfine
+            # In case of auxiliary traditional head output at first decoder layer.
             if 'dn_pre_outputs' in outputs:
                 aux_outputs = outputs['dn_pre_outputs']
                 for loss in self.losses:

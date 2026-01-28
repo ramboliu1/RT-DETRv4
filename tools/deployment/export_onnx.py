@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', '-c', default='configs/dfine/dfine_hgnetv2_l_coco.yml', type=str, )
+    parser.add_argument('--config', '-c', default='configs/rtv4/rtv4_hgnetv2_s_coco.yml', type=str, )
     parser.add_argument('--resume', '-r', type=str, )
     parser.add_argument('--check',  action='store_true', default=True,)
     parser.add_argument('--simplify',  action='store_true', default=True,)

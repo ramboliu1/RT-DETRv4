@@ -18,9 +18,6 @@ from ._config import BaseConfig
 from .workspace import create
 from .yaml_utils import load_config, merge_config, merge_dict
 
-from ..rtv4.dinov3_teacher import DINOv3TeacherModel
-from ..rtv4.dinov2_teacher import DINOv2TeacherModel
-from ..misc import dist_utils # Assuming remove_module_prefix is there, or define it from _solver.py as needed.
 
 
 class YAMLConfig(BaseConfig):
@@ -45,38 +42,6 @@ class YAMLConfig(BaseConfig):
         if self._model is None and 'model' in self.yaml_cfg:
             self._model = create(self.yaml_cfg['model'], self.global_cfg)
         return super().model
-
-    @property
-    def teacher_model(self, ) -> torch.nn.Module:
-        if self._teacher_model is None and 'teacher_model' in self.yaml_cfg:
-            teacher_model_cfg = self.yaml_cfg['teacher_model']
-
-            model_type = teacher_model_cfg.pop('type', None)
-            # more VFMs will be added.
-            if model_type == "DINOv3TeacherModel":
-                try:
-                    self._teacher_model = DINOv3TeacherModel(**teacher_model_cfg)
-                    teacher_model_cfg['type'] = model_type
-                    if dist_utils.is_main_process():
-                        print("Successfully loaded and configured DINOv3 Teacher Model.")
-                except Exception as e:
-                    print(f"Error creating DINOv3TeacherModel: {e}")
-                    teacher_model_cfg['type'] = model_type
-                    raise
-            elif model_type == "DINOv2TeacherModel":
-                try:
-                    self._teacher_model = DINOv2TeacherModel(**teacher_model_cfg)
-                    if dist_utils.is_main_process():
-                        print("Successfully loaded and configured DINOv2 Teacher Model.")
-                except Exception as e:
-                    print(f"Error creating DINOv2TeacherModel: {e}")
-                    teacher_model_cfg['type'] = model_type
-                    raise
-            else:
-                print(
-                    f"Configured teacher_model type '{model_type}' does not match expected 'DINOv3TeacherModel'.")
-                raise ValueError("Mismatch in teacher model type configuration.")
-        return super().teacher_model
 
     @property
     def postprocessor(self, ) -> torch.nn.Module:
