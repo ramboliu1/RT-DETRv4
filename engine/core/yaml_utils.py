@@ -98,10 +98,10 @@ def merge_config(cfg, another_cfg=GLOBAL_CONFIG, inplace: bool=False, overwrite:
 
     Example:
 
-        cfg1 = load_config('./dfine_r18vd_6x_coco.yml')
+        cfg1 = load_config('./rtv4_hgnetv2_s_coco.yml')
         cfg1 = merge_config(cfg, inplace=True)
 
-        cfg2 = load_config('./dfine_r50vd_6x_coco.yml')
+        cfg2 = load_config('./rtv4_hgnetv2_s_coco.yml')
         cfg2 = merge_config(cfg2, inplace=True)
 
         model1 = create(cfg1['model'], cfg1)

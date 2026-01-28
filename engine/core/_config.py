@@ -83,16 +83,10 @@ class BaseConfig(object):
         self.summary_dir :str = None
         self.device : str = ''
 
-        # distillation: General distillation control switch
-        self._teacher_model: nn.Module = None
 
     @property
     def model(self, ) -> nn.Module:
         return self._model
-
-    @property
-    def teacher_model(self, ) -> nn.Module:
-        return self._teacher_model
 
     @model.setter
     def model(self, m):

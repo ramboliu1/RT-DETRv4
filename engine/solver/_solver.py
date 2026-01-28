@@ -54,9 +54,6 @@ class BaseSolver(object):
 
         self.model = cfg.model
 
-        # Setup teacher model
-        self.teacher_model = to(cfg.teacher_model, device)
-
         # NOTE: Must load_tuning_state before EMA instance building
         if self.cfg.tuning:
             print(f'Tuning checkpoint from {self.cfg.tuning}')

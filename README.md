@@ -28,7 +28,7 @@ This is the official implementation of the paper:
 
 ## 🚀 Overview
 
-**RT-DETRv4 is the new version of the state-of-the-art real-time object detector family, RT-DETR.** It introduces a cost-effective and adaptable distillation framework that leverages the powerful representations of Vision Foundation Models (VFMs) to enhance lightweight detectors.
+**RT-DETRv4 is the new version of the state-of-the-art real-time object detector family, RT-DETR.**
 <p align="center">
   <img src="./figures/rtv4_ap_latency.png" alt="Image" width="49%">
 </p>
@@ -52,9 +52,6 @@ RT-DETRv4 achieves new state-of-the-art results on the COCO dataset, outperformi
 | Model | AP | AP50 | AP75 | Latency (T4) | FPS (T4) | Config | Log | Checkpoint |
 | :--- | :---: | :---: | :---: | :---: | :---: |:---------------------------------------------:|:----------------------------:|:---:|
 | RT-DETRv4-S | 49.8 | 67.1 | 54.0 | 3.66 ms | 273 | [yml](./configs/rtv4/rtv4_hgnetv2_s_coco.yml) | [log](./logs/RTv4-S-hgnet.log) | [ckpt](https://drive.google.com/file/d/1jDAVxblqRPEWed7Hxm6GwcEl7zn72U6z) |
-| RT-DETRv4-M | 53.7 | 71.0 | 58.4 | 5.91 ms | 169 | [yml](./configs/rtv4/rtv4_hgnetv2_m_coco.yml) | [log](./logs/RTv4-M-hgnet.log) | [ckpt](https://drive.google.com/file/d/1O-YpP4X-quuOXbi96y2TKkztbjroP5mX) |
-| RT-DETRv4-L | 55.4 | 73.0 | 60.3 | 8.07 ms | 124 | [yml](./configs/rtv4/rtv4_hgnetv2_l_coco.yml) | [log](./logs/RTv4-L-hgnet.log) | [ckpt](https://drive.google.com/file/d/1shO9EzZvXZyKedE2urLsN4dwEv8Jqa_8) |
-| RT-DETRv4-X | 57.0 | 74.6 | 62.1 | 12.90 ms | 78 | [yml](./configs/rtv4/rtv4_hgnetv2_x_coco.yml) | [log](./logs/RTv4-X-hgnet.log) | [ckpt](https://drive.google.com/file/d/19gnkMTgFveJsrOvSmEPQXCTG6v9oQHN3) |
 ## 📣 News
 
   * **[2025.11.17]** Code, configs and checkpoints fully released! Thanks for your attention, and feel free to ask any questions!
@@ -70,7 +67,7 @@ RT-DETRv4 achieves new state-of-the-art results on the COCO dataset, outperformi
 
 -----
 
-> This repository also supports the reproduction of [DEIM](./configs/deim/), [D-FINE](./configs/dfine/), and [RT-DETRv2](./configs/rtv2/). Simply run the corresponding configuration files.
+> This repository focuses on RT-DETRv4-S only.
 
 ## 1\. Getting Started
 
@@ -203,26 +200,6 @@ To train on your custom dataset, you need to organize it in the COCO format. Fol
 
 </details>
 
-### Teacher Model Preparation
-
-Our framework uses a pre-trained Vision Foundation Model (VFM) as the teacher. We use the **ViT-B/16-LVD-1689M** model from DINOv3.
-
-  * **Repository:** [DINOv3](https://github.com/facebookresearch/dinov3)
-  * **Weights:** [Downloads](https://ai.meta.com/resources/models-and-libraries/dinov3-downloads/)
-
-
-### Configuring DINOv3 Teacher
-
-Specify the paths to your local DINOv3 repository and the downloaded checkpoint in the model's configuration file `./configs/rtv4/rtv4_hgnetv2_${model}_coco.yml` and find the `teacher_model` section:
-
-```yaml
-teacher_model:
-  type: "DINOv3TeacherModel"
-  dinov3_repo_path: dinov3/
-  dinov3_weights_path: pretrain/dinov3_vitb16_pretrain_lvd1689m.pth
-```
-
-Update the `dinov3_repo_path` and `dinov3_weights_path` to match your local setup.
 
 ## 2\. Usage
 
@@ -232,19 +209,19 @@ Update the `dinov3_repo_path` and `dinov3_weights_path` to match your local setu
 1.  Training
 
     ```shell
-    CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port=7777 --nproc_per_node=4 train.py -c configs/rtv4/rtv4_hgnetv2_${model}_coco.yml --use-amp --seed=0
+    CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port=7777 --nproc_per_node=4 train.py -c configs/rtv4/rtv4_hgnetv2_s_coco.yml --use-amp --seed=0
     ```
 
 2.  Testing
 
     ```shell
-    CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port=7777 --nproc_per_node=4 train.py -c configs/rtv4/rtv4_hgnetv2_${model}_coco.yml --test-only -r model.pth
+    CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port=7777 --nproc_per_node=4 train.py -c configs/rtv4/rtv4_hgnetv2_s_coco.yml --test-only -r model.pth
     ```
 
 3.  Tuning
 
     ```shell
-    CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port=7777 --nproc_per_node=4 train.py -c configs/rtv4/rtv4_hgnetv2_${model}_coco.yml --use-amp --seed=0 -t model.pth
+    CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port=7777 --nproc_per_node=4 train.py -c configs/rtv4/rtv4_hgnetv2_s_coco.yml --use-amp --seed=0 -t model.pth
     ```
 
 </details>
@@ -333,7 +310,7 @@ If you'd like to train **RT-DETRv4** on COCO2017 with an input size of 320x320, 
 2.  Export onnx
 
     ```shell
-    python tools/deployment/export_onnx.py --check -c configs/rtv4/rtv4_hgnetv2_${model}_coco.yml -r model.pth
+    python tools/deployment/export_onnx.py --check -c configs/rtv4/rtv4_hgnetv2_s_coco.yml -r model.pth
     ```
 
 3.  Export [tensorrt](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html)
@@ -347,77 +324,10 @@ If you'd like to train **RT-DETRv4** on COCO2017 with an input size of 320x320, 
 <details>
 <summary> Inference (Visualization) </summary>
 
-1.  Setup
+1.  Inference (torch)
 
     ```shell
-    pip install -r tools/inference/requirements.txt
-    ```
-
-2.  Inference (onnxruntime / tensorrt / torch)
-
-    Inference on images and videos is now supported.
-
-    ```shell
-    python tools/inference/onnx_inf.py --onnx model.onnx --input image.jpg  # or video.mp4
-    python tools/inference/trt_inf.py --trt model.engine --input image.jpg
-    python tools/inference/torch_inf.py -c configs/rtv4/rtv4_hgnetv2_${model}_coco.yml -r model.pth --input image.jpg --device cuda:0
-    ```
-
-</details>
-
-<details>
-<summary> Benchmark </summary>
-
-1.  Setup
-
-    ```shell
-    pip install -r tools/benchmark/requirements.txt
-    ```
-
-2.  Model FLOPs, MACs, and Params
-
-    ```shell
-    python tools/benchmark/get_info.py -c configs/rtv4/rtv4_hgnetv2_${model}_coco.yml
-    ```
-
-3.  TensorRT Latency
-
-    ```shell
-    python tools/benchmark/trt_benchmark.py --COCO_dir path/to/COCO2017 --engine_dir model.engine
-    ```
-
-</details>
-
-<details>
-<summary> Fiftyone Visualization </summary>
-
-1.  Setup
-
-    ```shell
-    pip install fiftyone
-    ```
-
-2.  Voxel51 Fiftyone Visualization ([fiftyone](https://github.com/voxel51/fiftyone))
-
-    ```shell
-    python tools/visualization/fiftyone_vis.py -c configs/rtv4/rtv4_hgnetv2_${model}_coco.yml -r model.pth
-    ```
-
-</details>
-
-<details>
-<summary> Others </summary>
-
-1.  Auto Resume Training
-
-    ```shell
-    bash tools/reference/safe_training.sh
-    ```
-
-2.  Converting Model Weights
-
-    ```shell
-    python tools/reference/convert_weight.py model.pth
+    python tools/inference/torch_inf.py -c configs/rtv4/rtv4_hgnetv2_s_coco.yml -r model.pth --input image.jpg --device cuda:0
     ```
 
 </details>
@@ -437,5 +347,5 @@ If you find this work helpful, please consider citing:
 
 ## 5\. Acknowledgement
 
-Our work is built upon [RT-DETR](https://github.com/lyuwenyu/RT-DETR), [D-FINE](https://github.com/Peterande/D-FINE), [DEIM](https://github.com/Intellindust-AI-Lab/DEIM) and Teacher Model [DINOv3](https://github.com/facebookresearch/dinov3).
+Our work is built upon [RT-DETR](https://github.com/lyuwenyu/RT-DETR).
 Thanks to these remarkable works!
